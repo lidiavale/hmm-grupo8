@@ -1,7 +1,9 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, KFold
+from scipy.io import loadmat
 import random
+import pandas as pd
 
 # --- PARÂMETROS DO AG ---
 POP_SIZE   = 50
@@ -50,10 +52,13 @@ def tournament(pop, fitnesses, k=3):
 
 # --- CROSSOVER 1‐PONTO ---
 def crossover(p1, p2):
+    if len(p1) < 2:
+        return p1.copy(), p2.copy()
     point = random.randrange(1, len(p1))
     c1 = np.concatenate([p1[:point], p2[point:]])
     c2 = np.concatenate([p2[:point], p1[point:]])
     return c1, c2
+
 
 # --- MUTAÇÃO BIT FLIP ---
 def mutate(mask, pmut):
@@ -65,7 +70,7 @@ def mutate(mask, pmut):
 # --- LOOP PRINCIPAL ---
 def genetic_algorithm(X_cal, y_cal):
     n_features = X_cal.shape[1]
-    # 1) gera população inicial
+
     pop = init_population(POP_SIZE, n_features)
 
     # 2) avalia fitness inicial
@@ -110,20 +115,25 @@ def genetic_algorithm(X_cal, y_cal):
 
     return best_ind, best_fit
 
-# --- USO ---
-# supondo que você já tenha:
-#   X_cal (89×372) e y_cal (89,)
-# carregados via numpy ou pandas
 
 if __name__ == "__main__":
     # Exemplo de carregamento (substituir pelos seus dados):
-    X_cal = np.loadtxt("Dados/2012/IDRC_Validation_set_references.xlsx.xlsx", delimiter=",")
-    y_cal = np.loadtxt("Dados/2012/IDRC_Validation_set_references.xlsx.xlsx", delimiter=",")
+    df = pd.read_excel("Dados/2012/IDRC_Validation_set_references.xlsx")
+    mat = loadmat("Dados/2012/ShootOut2012MATLAB/IDRC_Validation_set_references_Sheet1.mat")
+
+    X_cal = df.iloc[:, :-1].values    
+    y_cal = df.iloc[:,  -1].values 
+
+    print("X_cal shape:", X_cal.shape)
+    print("y_cal shape:", y_cal.shape)
+    print(" Chaves:", mat.keys())
+
 
     best_mask, best_rmse = genetic_algorithm(X_cal, y_cal)
     print("Máscara ótima encontrada!")
     print("RMSE (CV):", best_rmse)
     print("Número de variáveis selecionadas:", best_mask.sum())
+
     # Para treinar o modelo final:
     X_sel = X_cal[:, best_mask.astype(bool)]
     final_model = LinearRegression().fit(X_sel, y_cal)
