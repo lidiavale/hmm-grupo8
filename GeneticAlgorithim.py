@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, KFold
 from scipy.io import loadmat
+from sklearn.metrics import mean_squared_error, r2_score
 import random
 import pandas as pd
 
@@ -120,20 +121,49 @@ if __name__ == "__main__":
     # Exemplo de carregamento (substituir pelos seus dados):
     df = pd.read_excel("Dados/2012/IDRC_Validation_set_references.xlsx")
     mat = loadmat("Dados/2012/ShootOut2012MATLAB/IDRC_Validation_set_references_Sheet1.mat")
+    mat2 = loadmat("Dados/2012/ShootOut2012MATLAB/ShootOut2012MATLAB.mat")
 
-    X_cal = df.iloc[:, :-1].values    
-    y_cal = df.iloc[:,  -1].values 
+    X_cal_calibration = mat2["inputCalibration"]   
+    y_cal_calibration = mat2["targetCalibration"].ravel()
 
-    print("X_cal shape:", X_cal.shape)
-    print("y_cal shape:", y_cal.shape)
-    print(" Chaves:", mat.keys())
+    print("X_cal_calibration shape:", X_cal_calibration.shape)
+    print("y_cal_calibration shape:", y_cal_calibration.shape)
+    
+    X_test = mat2["inputTest"]
+    y_test = mat2["targetTest"].ravel()
+
+    X_val = mat2["inputValidation"]
+
+    #print(" Chaves:", mat2.keys())
+    #print(" . Mat Valores 2:", mat2)
 
 
-    best_mask, best_rmse = genetic_algorithm(X_cal, y_cal)
+    best_mask, best_rmse = genetic_algorithm(X_cal_calibration, y_cal_calibration)
+
     print("Máscara ótima encontrada!")
     print("RMSE (CV):", best_rmse)
     print("Número de variáveis selecionadas:", best_mask.sum())
 
     # Para treinar o modelo final:
-    X_sel = X_cal[:, best_mask.astype(bool)]
-    final_model = LinearRegression().fit(X_sel, y_cal)
+    X_sel = X_cal_calibration[:, best_mask.astype(bool)]
+    final_model = LinearRegression().fit(X_sel, y_cal_calibration)
+
+    mask_bool    = best_mask.astype(bool)
+    X_test_sel   = X_test[:,  mask_bool]
+    X_val_sel    = X_val[:,   mask_bool]
+
+    # 2) Gere as previsões
+    y_test_pred  = final_model.predict(X_test_sel)
+    y_val_pred   = final_model.predict(X_val_sel)
+
+    rmse_test = mean_squared_error(y_test, y_test_pred)
+    r2_test   = r2_score(y_test, y_test_pred)
+
+    print("=== Desempenho no Test Set ===")
+    print(f"RMSE: {rmse_test:.4f}")
+    print(f"R²:   {r2_test:.4f}")
+
+    # 4) Veja as previsões para validação (submissão)
+    print("Previsões para Validation Set (67 amostras):")
+    print(y_val_pred)
+
